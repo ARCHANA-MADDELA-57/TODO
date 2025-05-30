@@ -92,8 +92,31 @@ h1, h2, h3 {
     color: #888;
 }
 
+/* Edit Mode Styling */
+.task-item.editing .task-description-text {
+    display: none; /* Hide the text when editing */
+}
+
+.task-item .edit-input {
+    flex-grow: 1; /* Allow input to take available space */
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    display: none; /* Hidden by default */
+}
+
+.task-item.editing .edit-input {
+    display: block; /* Show input when editing */
+}
+
+.task-item .action-buttons {
+    display: flex; /* Arrange buttons side-by-side */
+    gap: 5px; /* Space between buttons */
+}
+
 .task-item button {
-    margin-left: 10px;
+    margin-left: 0px; /* Reset default margin from previous rule */
     padding: 5px 10px;
     border: none;
     border-radius: 3px;
@@ -117,6 +140,48 @@ h1, h2, h3 {
 
 .task-item .delete-button:hover {
     background-color: #c82333;
+}
+
+.task-item .edit-button {
+    background-color: #ffc107; /* Yellow for Edit */
+    color: #333;
+}
+
+.task-item .edit-button:hover {
+    background-color: #e0a800;
+}
+
+.task-item .save-button {
+    background-color: #007bff; /* Blue for Save */
+    color: white;
+}
+.task-item .save-button:hover {
+    background-color: #0056b3;
+}
+
+.task-item .cancel-button {
+    background-color: #6c757d; /* Grey for Cancel */
+    color: white;
+}
+.task-item .cancel-button:hover {
+    background-color: #5a6268;
+}
+
+/* Hide save/cancel by default */
+.task-item .save-button, .task-item .cancel-button {
+    display: none;
+}
+
+/* Show save/cancel when editing */
+.task-item.editing .save-button, .task-item.editing .cancel-button {
+    display: inline-block;
+}
+
+/* Hide edit/complete/delete when editing */
+.task-item.editing .edit-button,
+.task-item.editing .complete-button,
+.task-item.editing .delete-button {
+    display: none;
 }
 
 .add-task-form {
