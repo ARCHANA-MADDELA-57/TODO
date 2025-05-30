@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your To-Do List</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h2 id="welcomeMessage">Welcome, User!</h2>
+        <h3>Your Tasks</h3>
+        <form id="addTaskForm" class="add-task-form">
+            <input type="text" id="newTask" placeholder="Add a new task..." required>
+            <button type="submit" class="button">Add Task</button>
+        </form>
+        <ul id="taskList" class="task-list">
+            </ul>
+        <button id="logoutButton" class="button logout-button">Logout</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
