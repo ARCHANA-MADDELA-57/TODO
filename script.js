@@ -4,19 +4,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const addTaskForm = document.getElementById('addTaskForm');
     const taskList = document.getElementById('taskList');
     const logoutButton = document.getElementById('logoutButton');
-    const messageElement = document.getElementById('message');
-    const welcomeMessageElement = document.getElementById('welcomeMessage');
+    const messageElement = document.getElementById('message'); // Used on login/register
+    const welcomeMessageElement = document.getElementById('welcomeMessage'); // Used on dashboard
 
-    const backendBaseUrl = 'http://127.0.0.1:5000'; // Replace with your backend URL
+    const backendBaseUrl = 'http://127.0.0.1:5000'; // <<<< ENSURE THIS IS YOUR FLASK SERVER URL
 
     // --- Helper functions ---
     function showMessage(element, text, isError = true) {
-        element.textContent = text;
-        element.style.color = isError ? 'red' : 'green';
+        if (element) { // Check if element exists before manipulating (for different pages)
+            element.textContent = text;
+            element.style.color = isError ? 'red' : 'green';
+        } else {
+            console.warn(`Message element not found: ${text}`);
+        }
     }
 
     function clearMessage(element) {
-        element.textContent = '';
+        if (element) {
+            element.textContent = '';
+        }
     }
 
     async function fetchData(url, options = {}) {
@@ -43,12 +49,32 @@ document.addEventListener('DOMContentLoaded', () => {
             return data;
         } catch (error) {
             console.error('Fetch error:', error);
-            showMessage(messageElement, error.message, true);
+            // On dashboard, messageElement might be null, so use alert
+            if (messageElement) {
+                showMessage(messageElement, error.message, true);
+            } else {
+                alert(`Error: ${error.message}`);
+            }
             return null;
         }
     }
 
-    // --- Registration ---
+    // Simplified JWT Token Parsing (for displaying username)
+    function parseJwt (token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return {}; // Return empty object on error
+        }
+    };
+
+    // --- Registration Form Logic ---
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -79,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Login ---
+    // --- Login Form Logic ---
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -106,8 +132,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Dashboard (To-Do List) ---
-    if (taskList) {
+    // --- Dashboard (To-Do List) Logic ---
+    if (taskList) { // This block runs only on dashboard.html
         const token = localStorage.getItem('token');
         if (!token) {
             window.location.href = 'login.html'; // Redirect if not logged in
@@ -126,8 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Function to render tasks dynamically
         function renderTasks(tasks) {
-            taskList.innerHTML = '';
+            taskList.innerHTML = ''; // Clear existing tasks
             if (tasks.length === 0) {
                 taskList.innerHTML = '<p>No tasks yet! Add one above.</p>';
                 return;
@@ -135,20 +162,26 @@ document.addEventListener('DOMContentLoaded', () => {
             tasks.forEach(task => {
                 const li = document.createElement('li');
                 li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                li.dataset.taskId = task.id; // Store task ID for easy access
+
                 li.innerHTML = `
-                    <span>${task.task_description}</span>
-                    <div>
-                        <button class="complete-button" data-id="${task.id}" data-completed="${task.completed ? 'true' : 'false'}">
+                    <span class="task-description-text">${task.task_description}</span>
+                    <input type="text" class="edit-input" value="${task.task_description}">
+                    <div class="action-buttons">
+                        <button class="edit-button button" data-id="${task.id}">Edit</button>
+                        <button class="save-button button" data-id="${task.id}">Save</button>
+                        <button class="cancel-button button" data-id="${task.id}">Cancel</button>
+                        <button class="complete-button button" data-id="${task.id}" data-completed="${task.completed ? 'true' : 'false'}">
                             ${task.completed ? 'Undo' : 'Complete'}
                         </button>
-                        <button class="delete-button" data-id="${task.id}">Delete</button>
+                        <button class="delete-button button" data-id="${task.id}">Delete</button>
                     </div>
                 `;
                 taskList.appendChild(li);
             });
         }
 
-        // Add Task
+        // Add Task - Form Submission
         addTaskForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const newTaskDescription = document.getElementById('newTask').value.trim();
@@ -159,17 +192,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ task_description: newTaskDescription })
                 });
                 if (data) {
-                    document.getElementById('newTask').value = '';
-                    fetchTasks();
+                    document.getElementById('newTask').value = ''; // Clear input field
+                    fetchTasks(); // Re-fetch and render tasks
                 }
             }
         });
 
-        // Complete/Delete Task
+        // Event Delegation for Complete, Delete, Edit, Save, Cancel buttons
         taskList.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('complete-button')) {
-                const taskId = e.target.dataset.id;
-                const currentCompleted = e.target.dataset.completed === 'true';
+            const target = e.target;
+            const taskId = target.dataset.id;
+            const listItem = target.closest('.task-item'); // Get the parent <li> element
+
+            if (!listItem || !taskId) return; // Not a task item or missing ID
+
+            // --- Complete/Undo Task ---
+            if (target.classList.contains('complete-button')) {
+                const currentCompleted = target.dataset.completed === 'true';
                 const data = await fetchData(`${backendBaseUrl}/tasks/${taskId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -178,8 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data) {
                     fetchTasks();
                 }
-            } else if (e.target.classList.contains('delete-button')) {
-                const taskId = e.target.dataset.id;
+            }
+            // --- Delete Task ---
+            else if (target.classList.contains('delete-button')) {
                 const data = await fetchData(`${backendBaseUrl}/tasks/${taskId}`, {
                     method: 'DELETE'
                 });
@@ -187,32 +227,72 @@ document.addEventListener('DOMContentLoaded', () => {
                     fetchTasks();
                 }
             }
+            // --- Edit Task (start editing mode) ---
+            else if (target.classList.contains('edit-button')) {
+                listItem.classList.add('editing'); // Add 'editing' class to <li>
+                const editInput = listItem.querySelector('.edit-input');
+                editInput.focus(); // Focus on the input field
+                editInput.setSelectionRange(editInput.value.length, editInput.value.length); // Place cursor at end
+            }
+            // --- Save Edited Task ---
+            else if (target.classList.contains('save-button')) {
+                const newDescription = listItem.querySelector('.edit-input').value.trim();
+                if (newDescription === '') {
+                    alert('Task description cannot be empty!');
+                    return;
+                }
+                const data = await fetchData(`${backendBaseUrl}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_description: newDescription })
+                });
+                if (data) {
+                    listItem.classList.remove('editing'); // Exit editing mode
+                    fetchTasks(); // Re-fetch to update UI with new description
+                }
+            }
+            // --- Cancel Editing ---
+            else if (target.classList.contains('cancel-button')) {
+                listItem.classList.remove('editing'); // Exit editing mode
+                // No need to revert input value, fetchTasks will refresh if needed
+                fetchTasks(); // Ensure UI consistency
+            }
         });
 
-        // Initial task load
+        // Optional: Allow saving on Enter key press in edit mode input
+        taskList.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('edit-input')) {
+                e.preventDefault(); // Prevent default form submission if input is inside a form
+                const listItem = e.target.closest('.task-item');
+                const taskId = listItem.dataset.taskId; // Use data-taskId from li
+                const newDescription = e.target.value.trim();
+
+                if (newDescription === '') {
+                    alert('Task description cannot be empty!');
+                    return;
+                }
+
+                const data = await fetchData(`${backendBaseUrl}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_description: newDescription })
+                });
+                if (data) {
+                    listItem.classList.remove('editing');
+                    fetchTasks();
+                }
+            }
+        });
+
+        // Initial task load when dashboard loads
         fetchTasks();
     }
 
-    // --- Logout ---
+    // --- Logout Button Logic ---
     if (logoutButton) {
         logoutButton.addEventListener('click', () => {
             localStorage.removeItem('token');
             window.location.href = 'login.html';
         });
     }
-
-    // --- JWT Token Parsing (simplified, for displaying username) ---
-    function parseJwt (token) {
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-
-            return JSON.parse(jsonPayload);
-        } catch (e) {
-            return {}; // Return empty object on error
-        }
-    };
 });
