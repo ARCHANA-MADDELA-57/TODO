@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify # Removed session, as it's not strictly needed with JWT
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import jwt
+from functools import wraps # Import wraps for the decorator
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all origins (for development)
@@ -11,14 +12,12 @@ CORS(app)  # Enable CORS for all origins (for development)
 # Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///todo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your_super_secret_key'  # Change this in production!
+app.config['SECRET_KEY'] = 'your_super_secret_key'  # <<<< CHANGE THIS IN PRODUCTION!
+app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key' # <<<< ANOTHER SECRET KEY FOR JWT, CHANGE THIS!
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1) # Token expiry
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
-
-# JWT Configuration
-app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key' # Another secret key for JWT
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1) # Token expiry
 
 # --- Database Models ---
 class User(db.Model):
@@ -76,7 +75,6 @@ def decode_token(token):
 
 # --- Authentication Decorator ---
 def token_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -112,6 +110,7 @@ def register():
     if not username or not email or not password:
         return jsonify({'message': 'Missing username, email, or password'}), 400
 
+    # Basic server-side validation
     if len(username) < 3:
         return jsonify({'message': 'Username must be at least 3 characters long'}), 400
     if not isinstance(email, str) or '@' not in email or '.' not in email:
@@ -180,8 +179,12 @@ def update_task(current_user, task_id):
         return jsonify({'message': 'Task not found or unauthorized'}), 404
 
     data = request.get_json()
+    # This endpoint now handles both 'completed' and 'task_description' updates
     if 'task_description' in data:
-        task.task_description = data['task_description']
+        new_description = data['task_description'].strip()
+        if not new_description:
+            return jsonify({'message': 'Task description cannot be empty'}), 400
+        task.task_description = new_description
     if 'completed' in data:
         task.completed = data['completed']
 
@@ -202,7 +205,6 @@ def delete_task(current_user, task_id):
 
 if __name__ == '__main__':
     # This block ensures tables are created when you run app.py directly.
-    # It must be within an application context.
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=True) # debug=True is for development, set to False in production
